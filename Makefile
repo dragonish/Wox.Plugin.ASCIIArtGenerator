@@ -72,9 +72,11 @@ endif
 ifeq ($(OS),Windows_NT)
 	$(POWERSHELL) "Copy-Item 'images' -Destination '$(DIST_DIR)' -Recurse"
 	$(POWERSHELL) "Copy-Item 'plugin.json' -Destination '$(DIST_DIR)'"
+	$(POWERSHELL) "Copy-Item 'node_modules/figlet/fonts' -Destination '$(DIST_DIR)/fonts' -Recurse"
 else
 	cp -r images $(DIST_DIR)
 	cp plugin.json $(DIST_DIR)
+	cp -RL node_modules/figlet/fonts $(DIST_DIR)/fonts
 endif
 
 test: check-init check-dev-deps
