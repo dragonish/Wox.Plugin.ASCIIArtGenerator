@@ -1,20 +1,20 @@
 {
-  "Id": "{{.Id}}",
-  "TriggerKeywords": [
-    "{{.TriggerKeyword}}"
-  ],
-  "Name": "{{.Name}}",
-  "Description": "{{.Description}}",
-  "Author": "{{.Author}}",
-  "Version": "0.0.7",
-  "MinWoxVersion": "2.0.0",
-  "Runtime": "nodejs",
-  "Website": "{{.Website}}",
-  "Entry": "index.js",
-  "Icon": "relative:images/app.svg",
-  "SupportedOS": [
-    "windows",
-    "linux",
-    "darwin"
-  ]
+    "Id": "242ec423-0ac0-47d9-8c93-e72c4d509eb2",
+    "TriggerKeywords": [
+        "ascii"
+    ],
+    "Name": "ASCIIArtGenerator",
+    "Description": "Generate ASCII art strings.",
+    "Author": "dragonish",
+    "Version": "0.0.7",
+    "MinWoxVersion": "2.0.0",
+    "Runtime": "nodejs",
+    "Website": "https://github.com/dragonish/Wox.Plugin.ASCIIArtGenerator",
+    "Entry": "index.js",
+    "Icon": "relative:images/app.svg",
+    "SupportedOS": [
+        "Windows",
+        "Linux",
+        "Darwin"
+    ]
 }

@@ -1,11 +1,7 @@
-> For developer
+# ASCIIArtGenerator
 
-    Please run `make init` to initialize the project.
+## Install
 
-# {{.Name}}
-
-# Install
-
-```
-wpm install {{.Name}}
+```shell
+wpm install ASCIIArtGenerator
 ```
