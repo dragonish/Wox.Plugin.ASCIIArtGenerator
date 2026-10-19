@@ -5,7 +5,7 @@
   "Description": "i18n:plugin_desc",
   "Author": "dragonish",
   "Version": "0.0.1",
-  "MinWoxVersion": "2.4.0",
+  "MinWoxVersion": "2.4.3",
   "Runtime": "nodejs",
   "Website": "https://github.com/dragonish/Wox.Plugin.ASCIIArtGenerator",
   "Entry": "index.js",

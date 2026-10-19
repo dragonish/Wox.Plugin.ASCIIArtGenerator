@@ -3,6 +3,7 @@ import figlet from "figlet"
 import * as fs from "fs"
 import * as os from "os"
 import * as path from "path"
+import { buildArtPreview, PreviewTheme } from "./preview"
 
 const DEFAULT_FONT = "Standard"
 const SETTING_FONT_KEY = "font"
@@ -32,6 +33,27 @@ let listSample = ""
 let settingFontLabel = "Default font"
 let settingFontTooltip = "Font used when rendering without -f"
 const previewCache = new Map<string, string>()
+
+// GetThemeColors needs Wox >= 2.4.5 and one round trip per call, so remember the
+// palette for a while: a font list can hold 120 results in a single response.
+const THEME_CACHE_MS = 5 * 60 * 1000
+let themeCache: { theme: PreviewTheme | undefined; at: number } | undefined
+
+async function previewTheme(ctx: Context): Promise<PreviewTheme | undefined> {
+  if (themeCache && Date.now() - themeCache.at < THEME_CACHE_MS) {
+    return themeCache.theme
+  }
+  let theme: PreviewTheme | undefined
+  try {
+    const colors = await api.GetThemeColors(ctx, {})
+    theme = { Background: colors.Background, Text: colors.Text }
+  } catch {
+    // Older Wox releases have no GetThemeColors; the preview falls back to CSS.
+    theme = undefined
+  }
+  themeCache = { theme, at: Date.now() }
+  return theme
+}
 
 /** Split a query into tokens, honoring "double quotes" and 'single quotes'. Exported for tests. */
 export function tokenize(input: string): string[] {
@@ -204,20 +226,21 @@ function listFontsAction(trigger: string | undefined, sample = ""): ResultAction
 
 async function renderResult(ctx: Context, text: string, font: string, art: string, trigger: string | undefined): Promise<Result> {
   const lines = art.split("\n").length
+  const theme = await previewTheme(ctx)
   return {
     Title: await t(ctx, "render_title", text),
     SubTitle: await t(ctx, "render_subtitle", font),
     Icon: appIcon,
     Score: 100,
-    Preview: {
-      PreviewType: "text",
-      PreviewData: art,
-      PreviewProperties: {
+    Preview: buildArtPreview(
+      art,
+      {
         Font: font,
         Lines: String(lines),
         Characters: String(text.length)
-      }
-    },
+      },
+      theme
+    ),
     Actions: [
       copyAction(text, art, font),
       saveAction(text, art, font),
@@ -240,6 +263,7 @@ async function fontListResults(ctx: Context, filter: string): Promise<Result[]> 
   const lower = filter.toLowerCase()
   const matched = fontNames.filter(f => !lower || f.toLowerCase().includes(lower)).slice(0, 120)
   const subtitle = await t(ctx, "font_item_subtitle", sample)
+  const theme = await previewTheme(ctx)
   return matched.map(font => {
     let art = ""
     try {
@@ -293,14 +317,14 @@ async function fontListResults(ctx: Context, filter: string): Promise<Result[]> 
       ]
     }
     if (art) {
-      result.Preview = {
-        PreviewType: "text",
-        PreviewData: art,
-        PreviewProperties: {
+      result.Preview = buildArtPreview(
+        art,
+        {
           Font: font,
           Sample: sample
-        }
-      }
+        },
+        theme
+      )
     }
     return result
   })

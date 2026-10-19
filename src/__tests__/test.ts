@@ -7,8 +7,9 @@ jest.mock("figlet", () => ({
   }
 }))
 
-import { Context, PluginInitParams, PublicAPI, Query, Result } from "@wox-launcher/wox-plugin"
+import { Context, PluginInitParams, PublicAPI, Query, Result, WoxPreview, WoxPreviewWebviewData } from "@wox-launcher/wox-plugin"
 import { fontsQueryText, plugin, tokenize } from "../index"
+import { buildArtPreview, unescapeHtml } from "../preview"
 
 describe("tokenize", () => {
   test("splits on whitespace", () => {
@@ -89,8 +90,21 @@ function actionIds(results: Result[]): string[] {
   return ids
 }
 
+/**
+ * Read the ASCII art back out of a result preview.
+ *
+ * Art ships as an HTML `<pre>` inside a `webview` preview, so unwrap the JSON
+ * payload and reverse the HTML escaping before asserting on it.
+ */
 function previewData(result: Result): string {
-  return (result.Preview as { PreviewData?: string } | undefined)?.PreviewData ?? ""
+  const preview = result.Preview as WoxPreview | undefined
+  if (!preview) {
+    return ""
+  }
+  expect(preview.PreviewType).toBe("webview")
+  const html = (JSON.parse(preview.PreviewData) as WoxPreviewWebviewData).html ?? ""
+  const match = /<pre[^>]*>([\s\S]*?)<\/pre>/.exec(html)
+  return unescapeHtml(match?.[1] ?? "")
 }
 
 async function clickAction(result: Result, idPrefix: string): Promise<void> {
@@ -245,5 +259,48 @@ describe("query hint slots", () => {
   test("supports the --font alias", async () => {
     const results = await runQuery("Slant hello", "", fontHint("Slant", "hello"))
     expect(actionIds(results)).toContain("copy:Slant")
+  })
+})
+
+// A `text` preview inherits the UI font, where spaces are proportional and figlet
+// drawings collapse. The art therefore ships as monospace HTML in a webview preview.
+describe("art preview", () => {
+  function htmlOf(preview: WoxPreview): string {
+    return (JSON.parse(preview.PreviewData) as WoxPreviewWebviewData).html ?? ""
+  }
+
+  test("uses a monospace stack and preformatted whitespace", () => {
+    const html = htmlOf(buildArtPreview("a  b\n c", { Font: "Standard" }))
+    expect(html).toContain("white-space:pre")
+    expect(html).toContain("monospace")
+  })
+
+  test("escapes art so figlet glyphs survive the HTML round trip", () => {
+    const art = ' /\\\n<&> "quoted"'
+    const html = htmlOf(buildArtPreview(art, {}))
+    expect(html).not.toContain("<&>")
+    expect(previewData({ Preview: buildArtPreview(art, {}) } as Result)).toBe(art)
+  })
+
+  test("keeps a leading newline instead of letting the parser drop it", () => {
+    const art = "\nabc"
+    expect(previewData({ Preview: buildArtPreview(art, {}) } as Result)).toBe(art)
+  })
+
+  test("shrinks wide art but never below 8px", () => {
+    const narrow = previewData({ Preview: buildArtPreview("x".repeat(10), {}) } as Result)
+    expect(narrow).toBe("x".repeat(10))
+
+    const wideHtml = htmlOf(buildArtPreview("x".repeat(200), {}))
+    expect(wideHtml).toContain("font-size:8px")
+
+    const narrowHtml = htmlOf(buildArtPreview("x", {}))
+    expect(narrowHtml).toContain("font-size:14px")
+  })
+
+  test("applies the launcher palette when the host provides one", () => {
+    const html = htmlOf(buildArtPreview("x", {}, { Background: "#101010", Text: "#e0e0e0" }))
+    expect(html).toContain("background:#101010")
+    expect(html).toContain("color:#e0e0e0")
   })
 })
