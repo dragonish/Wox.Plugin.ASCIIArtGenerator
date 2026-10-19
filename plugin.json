@@ -34,6 +34,9 @@
       "notify_copied_font_name": "Font name \"%s\" copied to clipboard",
       "notify_default_font": "Default font set to %s",
       "notify_saved": "Saved to %s",
+      "query_hint_filter": "filter",
+      "query_hint_font": "font",
+      "query_hint_text": "text",
       "render_subtitle": "Font: %s · Enter to copy",
       "render_title": "ASCII art of \"%s\"",
       "setting_font_label": "Default font",
@@ -61,6 +64,9 @@
       "notify_copied_font_name": "字体名称 \"%s\" 已复制到剪贴板",
       "notify_default_font": "默认字体已设为 %s",
       "notify_saved": "已保存到 %s",
+      "query_hint_filter": "筛选",
+      "query_hint_font": "字体",
+      "query_hint_text": "文本",
       "render_subtitle": "字体：%s · 回车复制",
       "render_title": "\"%s\" 的 ASCII 艺术字",
       "setting_font_label": "默认字体",
@@ -68,8 +74,25 @@
     }
   },
   "Commands": [
-    { "Command": "fonts", "Description": "i18n:command_fonts_desc" },
-    { "Command": "-f", "Description": "i18n:command_font_desc" }
+    {
+      "Command": "fonts",
+      "Description": "i18n:command_fonts_desc",
+      "QueryHint": {
+        "Elements": [{ "Id": "filter", "Kind": "argument", "Placeholder": "i18n:query_hint_filter" }]
+      }
+    },
+    {
+      "Command": "-f",
+      "Description": "i18n:command_font_desc",
+      "Aliases": ["--font"],
+      "QueryHint": {
+        "Elements": [
+          { "Id": "font", "Kind": "argument", "Placeholder": "i18n:query_hint_font", "Required": true },
+          { "Id": "sep", "Kind": "text", "Text": " " },
+          { "Id": "text", "Kind": "argument", "Placeholder": "i18n:query_hint_text", "Required": true }
+        ]
+      }
+    }
   ],
   "SettingDefinitions": [
     {

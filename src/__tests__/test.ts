@@ -63,9 +63,20 @@ function fakeApi(): PublicAPI {
   } as unknown as PublicAPI
 }
 
-async function runQuery(search: string, command = ""): Promise<Result[]> {
+async function runQuery(search: string, command = "", hint?: Query["QueryHint"]): Promise<Result[]> {
   await plugin.init(ctx, { API: fakeApi(), PluginDirectory: "" } as PluginInitParams)
-  return (await plugin.query(ctx, { Command: command, Search: search, TriggerKeyword: "ascii" } as unknown as Query)) as Result[]
+  return (await plugin.query(ctx, { Command: command, Search: search, QueryHint: hint, TriggerKeyword: "ascii" } as unknown as Query)) as Result[]
+}
+
+/** Build the QueryHint shape Wox installs for the declared "-f" template. */
+function fontHint(font: string, text: string): Query["QueryHint"] {
+  return {
+    Elements: [
+      { Id: "font", Kind: "argument", Value: font },
+      { Id: "sep", Kind: "text", Text: " " },
+      { Id: "text", Kind: "argument", Value: text }
+    ]
+  }
 }
 
 function actionIds(results: Result[]): string[] {
@@ -199,5 +210,40 @@ describe("declared commands", () => {
     const results = await runQuery("-l")
     expect(results.map(r => r.Title)).toEqual(["render_title"])
     expect(previewData(results[0])).toBe("art:Standard:-l")
+  })
+})
+
+// `ascii -f ` installs the QueryHint template declared in plugin.json, which splits the
+// font name (spaces allowed) from the text. The plugin prefers the hint slots when both
+// are filled and falls back to token parsing otherwise.
+describe("query hint slots", () => {
+  test("uses the font slot verbatim, so font names with spaces work", async () => {
+    const results = await runQuery("Emboss 2 hello", "-f", fontHint("Emboss 2", "hello"))
+    expect(actionIds(results)).toContain("copy:Emboss 2")
+    expect(previewData(results[0])).toBe("art:Emboss 2:hello")
+  })
+
+  test("keeps the text slot intact", async () => {
+    const results = await runQuery("Slant hello world", "-f", fontHint("Slant", "hello world"))
+    expect(previewData(results[0])).toBe("art:Slant:hello world")
+  })
+
+  // Without Tab the whole line lands in the font slot and the text slot stays empty.
+  // Falling back to token parsing keeps `ascii -f slant hello` working as before.
+  test("falls back to token parsing when the text slot is empty", async () => {
+    const results = await runQuery("slant hello", "-f", fontHint("slant hello", ""))
+    expect(actionIds(results)).toContain("copy:Slant")
+    expect(previewData(results[0])).toBe("art:Slant:hello")
+  })
+
+  test("reports a font name from the hint that does not exist", async () => {
+    const results = await runQuery("Nope hello", "-f", fontHint("Nope", "hello"))
+    expect(results[0].Title).toBe("error_font_not_found")
+  })
+
+  // `--font` is an alias of the declared "-f" command, so it installs the same template.
+  test("supports the --font alias", async () => {
+    const results = await runQuery("Slant hello", "", fontHint("Slant", "hello"))
+    expect(actionIds(results)).toContain("copy:Slant")
   })
 })

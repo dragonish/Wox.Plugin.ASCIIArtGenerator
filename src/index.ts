@@ -97,6 +97,16 @@ function resolveFont(name: string): string | undefined {
   return fontNames.find(f => f.toLowerCase() === lower)
 }
 
+/**
+ * Read one named argument from the QueryHint that Wox installed for a declared command.
+ * The Node.js host parses the hint the Go side sends as a JSON string, so the value is
+ * already an object here. Returns undefined when that slot is absent from the hint.
+ */
+function hintArgument(query: Query, id: string): string | undefined {
+  const element = query.QueryHint?.Elements?.find(e => e.Id === id)
+  return element && element.Kind === "argument" ? element.Value ?? "" : undefined
+}
+
 function suggestFonts(name: string, limit = 8): string[] {
   const lower = name.toLowerCase()
   return fontNames.filter(f => f.toLowerCase().includes(lower)).slice(0, limit)
@@ -445,9 +455,19 @@ export const plugin: Plugin = {
     }
 
     // ascii -f <font> <text> / ascii --font=<font> <text> — render with an explicit font
+    // Wox installs the "-f" QueryHint declared in plugin.json once the user types `ascii -f `,
+    // which keeps the font name (spaces allowed) and the text in separate Tab-navigable slots.
+    // Prefer the hint only when both slots are filled; otherwise (paste, a boundary-crossing
+    // edit, an older Wox, or the user never pressed Tab) parse the text as before.
+    const hintFont = hintArgument(query, "font")
+    const hintText = hintArgument(query, "text")
+
     let explicitFont: string | undefined
     let rest: string[] = []
-    if (head === "-f" || head === "--font") {
+    if (hintFont && hintText) {
+      explicitFont = hintFont
+      rest = [hintText]
+    } else if (head === "-f" || head === "--font") {
       // A missing font name stays an empty string instead of undefined so the shared
       // `!explicitFont` check below shows help rather than rendering the literal flag.
       explicitFont = tokens[1] ?? ""
