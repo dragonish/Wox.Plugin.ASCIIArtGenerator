@@ -8,7 +8,7 @@ jest.mock("figlet", () => ({
 }))
 
 import { Context, PluginInitParams, PublicAPI, Query, Result, WoxPreview, WoxPreviewWebviewData } from "@wox-launcher/wox-plugin"
-import { fontsQueryText, plugin, tokenize } from "../index"
+import { fontCommandText, fontsQueryText, plugin, tokenize } from "../index"
 import { buildArtPreview, unescapeHtml } from "../preview"
 
 describe("tokenize", () => {
@@ -46,12 +46,27 @@ describe("fontsQueryText", () => {
   })
 })
 
+describe("fontCommandText", () => {
+  test("uses the live trigger keyword", () => {
+    expect(fontCommandText("ascii", "Slant")).toBe("ascii -f Slant ")
+    expect(fontCommandText("aa", "Emboss 2")).toBe("aa -f Emboss 2 ")
+  })
+
+  test("falls back when the trigger keyword is missing", () => {
+    expect(fontCommandText("", "Slant")).toBe("-f Slant ")
+    expect(fontCommandText(undefined, "Slant")).toBe("-f Slant ")
+  })
+})
+
 const ctx = {} as Context
 const FONTS = ["Alpha", "Emboss 2", "Slant"]
+const changeQueries: string[] = []
 
 function fakeApi(): PublicAPI {
   return {
-    ChangeQuery: async () => {},
+    ChangeQuery: async (_ctx: Context, args: { QueryType: string; QueryText: string }) => {
+      changeQueries.push(args.QueryText)
+    },
     HideApp: async () => {},
     Notify: async () => {},
     Copy: async () => {},
@@ -132,6 +147,7 @@ describe("action ids are unique within one query response", () => {
       expect(ids).toContain(`copy-font-name:${font}`)
       expect(ids).toContain(`copy-art:${font}`)
       expect(ids).toContain(`set-default:${font}`)
+      expect(ids).toContain(`use-font:${font}`)
     }
   })
 
@@ -183,6 +199,19 @@ describe("font list preview text", () => {
     await clickAction(results[0], "list-fonts")
     const fonts = await runQuery("fonts")
     expect(previewData(fonts[0])).toBe("art:Alpha:hello")
+  })
+})
+
+// The "use-font" action rewrites the query to `ascii -f <font> ` so the user can
+// keep typing the text to render with that font.
+describe("use-font action", () => {
+  test("changes the query to `ascii -f <font> ` for the chosen font", async () => {
+    changeQueries.length = 0
+    const results = await runQuery("fonts")
+    const slant = results.find(r => r.Title === "Slant")
+    expect(slant).toBeDefined()
+    await clickAction(slant!, "use-font:")
+    expect(changeQueries).toEqual(["ascii -f Slant "])
   })
 })
 

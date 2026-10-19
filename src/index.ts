@@ -94,6 +94,16 @@ export function fontsQueryText(trigger: string | undefined): string {
   return trigger ? `${trigger} fonts ` : "fonts "
 }
 
+/**
+ * Build the complete query that keeps rendering with a chosen font, e.g.
+ * `ascii -f Slant `. The trailing space leaves Wox in the "-f" template so
+ * the user can type the text right away. The trigger keyword comes from the
+ * live query because the user can rename it. Exported for tests.
+ */
+export function fontCommandText(trigger: string | undefined, font: string): string {
+  return trigger ? `${trigger} -f ${font} ` : `-f ${font} `
+}
+
 async function t(ctx: Context, key: string, ...args: string[]): Promise<string> {
   try {
     let raw = await api.GetTranslation(ctx, key)
@@ -258,7 +268,7 @@ async function renderResult(ctx: Context, text: string, font: string, art: strin
   }
 }
 
-async function fontListResults(ctx: Context, filter: string): Promise<Result[]> {
+async function fontListResults(ctx: Context, filter: string, trigger: string | undefined): Promise<Result[]> {
   const sample = listSample || SAMPLE_FALLBACK
   const lower = filter.toLowerCase()
   const matched = fontNames.filter(f => !lower || f.toLowerCase().includes(lower)).slice(0, 120)
@@ -286,6 +296,17 @@ async function fontListResults(ctx: Context, filter: string): Promise<Result[]> 
             await api.Copy(actionCtx, { type: "text", text: full })
             await api.Notify(actionCtx, await t(actionCtx, "notify_copied"))
             await api.HideApp(actionCtx)
+          }
+        },
+        {
+          Id: `use-font:${font}`,
+          Name: "i18n:action_use_font",
+          PreventHideAfterAction: true,
+          Action: async actionCtx => {
+            await api.ChangeQuery(actionCtx, {
+              QueryType: "input",
+              QueryText: fontCommandText(trigger, font)
+            })
           }
         },
         {
@@ -467,7 +488,7 @@ export const plugin: Plugin = {
 
     // ascii fonts [filter] — browse fonts with a live preview
     if (head === "fonts") {
-      return fontListResults(ctx, tokens.slice(1).join(" "))
+      return fontListResults(ctx, tokens.slice(1).join(" "), trigger)
     }
 
     // Anything else means the user left the font list flow: forget the preview text
