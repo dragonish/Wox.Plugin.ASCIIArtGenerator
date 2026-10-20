@@ -4,9 +4,12 @@ import * as fs from "fs"
 import * as os from "os"
 import * as path from "path"
 import { buildArtPreview, PreviewTheme } from "./preview"
+import { buildSnippet, DEFAULT_SNIPPET_LANGUAGE, resolveSnippetLanguage, SNIPPET_LANGUAGES, SnippetLanguage } from "./snippets"
 
 const DEFAULT_FONT = "Standard"
 const SETTING_FONT_KEY = "font"
+const SETTING_COPY_CODE_ENABLED_KEY = "copy_code_enabled"
+const SETTING_COPY_CODE_LANGUAGE_KEY = "copy_code_language"
 const DYNAMIC_SETTING_KEY = "font_setting"
 const SAMPLE_FALLBACK = "Hello"
 
@@ -25,6 +28,8 @@ const figletAny = figlet as unknown as {
 let api: PublicAPI
 let fontNames: string[] = []
 let defaultFont = DEFAULT_FONT
+let copyCodeEnabled = false
+let codeLanguage = DEFAULT_SNIPPET_LANGUAGE
 // Text previewed in the font list. It is written only by the jump actions that lead
 // into the list, never by the render branches: Wox queries on every keystroke, so
 // typing "fonts" passes through "fo"/"fon" and would overwrite the user's text.
@@ -129,6 +134,23 @@ function resolveFont(name: string): string | undefined {
   return fontNames.find(f => f.toLowerCase() === lower)
 }
 
+/** Wox stores checkbox values as the strings "true" and "false". */
+function parseBoolean(value: string | undefined, fallback: boolean): boolean {
+  const normalized = (value ?? "").trim().toLowerCase()
+  if (normalized === "true" || normalized === "1") {
+    return true
+  }
+  if (normalized === "false" || normalized === "0" || normalized === "") {
+    return false
+  }
+  return fallback
+}
+
+/** Map a stored language id or label to a known registry entry. */
+function normalizeCodeLanguage(value: string | undefined): string {
+  return resolveSnippetLanguage(value)?.Id ?? DEFAULT_SNIPPET_LANGUAGE
+}
+
 /**
  * Read one named argument from the QueryHint that Wox installed for a declared command.
  * The Node.js host parses the hint the Go side sends as a JSON string, so the value is
@@ -205,6 +227,24 @@ function copyAction(text: string, art: string, font: string): ResultAction {
   }
 }
 
+function codeCopyAction(name: string, text: string, art: string, font: string, language: SnippetLanguage): ResultAction {
+  return {
+    Id: `copy-code:${font}:${language.Id}`,
+    Name: name,
+    Action: async (actionCtx: Context) => {
+      try {
+        const snippet = buildSnippet(language.Id, art)
+        await api.Copy(actionCtx, { type: "text", text: snippet })
+        await api.Notify(actionCtx, await t(actionCtx, "notify_copied_code", language.Label))
+        await api.HideApp(actionCtx)
+        await api.Log(actionCtx, "Info", `Copied ${language.Label} snippet of "${text}" in font ${font}`)
+      } catch (e) {
+        await api.Notify(actionCtx, await t(actionCtx, "error_copy_code_failed", String(e)))
+      }
+    }
+  }
+}
+
 function saveAction(text: string, art: string, font: string): ResultAction {
   return {
     Id: `save:${font}`,
@@ -237,6 +277,22 @@ function listFontsAction(trigger: string | undefined, sample = ""): ResultAction
 async function renderResult(ctx: Context, text: string, font: string, art: string, trigger: string | undefined): Promise<Result> {
   const lines = art.split("\n").length
   const theme = await previewTheme(ctx)
+  const actions: ResultAction[] = [copyAction(text, art, font)]
+  if (copyCodeEnabled) {
+    const language = resolveSnippetLanguage(codeLanguage) ?? SNIPPET_LANGUAGES[0]
+    actions.push(codeCopyAction(await t(ctx, "action_copy_code", language.Label), text, art, font, language))
+  }
+  actions.push(saveAction(text, art, font))
+  actions.push({
+    Id: `more-fonts:${font}`,
+    Name: "i18n:action_more_fonts",
+    PreventHideAfterAction: true,
+    Action: async actionCtx => {
+      // Remember what the user actually rendered so the font list previews it.
+      listSample = text
+      await api.ChangeQuery(actionCtx, { QueryType: "input", QueryText: fontsQueryText(trigger) })
+    }
+  })
   return {
     Title: await t(ctx, "render_title", text),
     SubTitle: await t(ctx, "render_subtitle", font),
@@ -251,20 +307,7 @@ async function renderResult(ctx: Context, text: string, font: string, art: strin
       },
       theme
     ),
-    Actions: [
-      copyAction(text, art, font),
-      saveAction(text, art, font),
-      {
-        Id: `more-fonts:${font}`,
-        Name: "i18n:action_more_fonts",
-        PreventHideAfterAction: true,
-        Action: async actionCtx => {
-          // Remember what the user actually rendered so the font list previews it.
-          listSample = text
-          await api.ChangeQuery(actionCtx, { QueryType: "input", QueryText: fontsQueryText(trigger) })
-        }
-      }
-    ]
+    Actions: actions
   }
 }
 
@@ -274,6 +317,8 @@ async function fontListResults(ctx: Context, filter: string, trigger: string | u
   const matched = fontNames.filter(f => !lower || f.toLowerCase().includes(lower)).slice(0, 120)
   const subtitle = await t(ctx, "font_item_subtitle", sample)
   const theme = await previewTheme(ctx)
+  const codeLanguageSpec = copyCodeEnabled ? resolveSnippetLanguage(codeLanguage) : undefined
+  const codeActionName = codeLanguageSpec ? await t(ctx, "action_copy_code", codeLanguageSpec.Label) : ""
   return matched.map(font => {
     let art = ""
     try {
@@ -281,61 +326,67 @@ async function fontListResults(ctx: Context, filter: string, trigger: string | u
     } catch {
       // leave the preview empty, the copy action will surface the error
     }
+    const actions: ResultAction[] = [
+      {
+        Id: `copy-art:${font}`,
+        Name: "i18n:action_copy",
+        IsDefault: true,
+        Action: async actionCtx => {
+          const full = previewOf(sample, font)
+          await api.Copy(actionCtx, { type: "text", text: full })
+          await api.Notify(actionCtx, await t(actionCtx, "notify_copied"))
+          await api.HideApp(actionCtx)
+        }
+      }
+    ]
+    if (codeLanguageSpec && art) {
+      actions.push(codeCopyAction(codeActionName, sample, art, font, codeLanguageSpec))
+    }
+    actions.push(
+      {
+        Id: `use-font:${font}`,
+        Name: "i18n:action_use_font",
+        PreventHideAfterAction: true,
+        Action: async actionCtx => {
+          await api.ChangeQuery(actionCtx, {
+            QueryType: "input",
+            QueryText: fontCommandText(trigger, font)
+          })
+        }
+      },
+      {
+        Id: `copy-font-name:${font}`,
+        Name: "i18n:action_copy_font_name",
+        Action: async actionCtx => {
+          await api.Copy(actionCtx, { type: "text", text: font })
+          await api.Notify(actionCtx, await t(actionCtx, "notify_copied_font_name", font))
+          await api.HideApp(actionCtx)
+        }
+      },
+      {
+        Id: `set-default:${font}`,
+        Name: "i18n:action_set_default_font",
+        Action: async actionCtx => {
+          defaultFont = font
+          const saved = await api.SetSetting(actionCtx, {
+            Key: SETTING_FONT_KEY,
+            Value: font,
+            PlatformSpecific: false,
+            IsLocal: false
+          })
+          if (!saved.Success) {
+            await api.Log(actionCtx, "Error", `Failed to save default font: ${saved.ErrMsg}`)
+          }
+          await api.Notify(actionCtx, await t(actionCtx, "notify_default_font", font))
+        }
+      }
+    )
     const result: Result = {
       Title: font,
       SubTitle: subtitle,
       Icon: appIcon,
       Score: lower ? (font.toLowerCase() === lower ? 100 : font.toLowerCase().startsWith(lower) ? 80 : 50) : 50,
-      Actions: [
-        {
-          Id: `copy-art:${font}`,
-          Name: "i18n:action_copy",
-          IsDefault: true,
-          Action: async actionCtx => {
-            const full = previewOf(sample, font)
-            await api.Copy(actionCtx, { type: "text", text: full })
-            await api.Notify(actionCtx, await t(actionCtx, "notify_copied"))
-            await api.HideApp(actionCtx)
-          }
-        },
-        {
-          Id: `use-font:${font}`,
-          Name: "i18n:action_use_font",
-          PreventHideAfterAction: true,
-          Action: async actionCtx => {
-            await api.ChangeQuery(actionCtx, {
-              QueryType: "input",
-              QueryText: fontCommandText(trigger, font)
-            })
-          }
-        },
-        {
-          Id: `copy-font-name:${font}`,
-          Name: "i18n:action_copy_font_name",
-          Action: async actionCtx => {
-            await api.Copy(actionCtx, { type: "text", text: font })
-            await api.Notify(actionCtx, await t(actionCtx, "notify_copied_font_name", font))
-            await api.HideApp(actionCtx)
-          }
-        },
-        {
-          Id: `set-default:${font}`,
-          Name: "i18n:action_set_default_font",
-          Action: async actionCtx => {
-            defaultFont = font
-            const saved = await api.SetSetting(actionCtx, {
-              Key: SETTING_FONT_KEY,
-              Value: font,
-              PlatformSpecific: false,
-              IsLocal: false
-            })
-            if (!saved.Success) {
-              await api.Log(actionCtx, "Error", `Failed to save default font: ${saved.ErrMsg}`)
-            }
-            await api.Notify(actionCtx, await t(actionCtx, "notify_default_font", font))
-          }
-        }
-      ]
+      Actions: actions
     }
     if (art) {
       result.Preview = buildArtPreview(
@@ -429,6 +480,16 @@ export const plugin: Plugin = {
       // keep default
     }
     try {
+      copyCodeEnabled = parseBoolean(await api.GetSetting(ctx, SETTING_COPY_CODE_ENABLED_KEY), false)
+    } catch {
+      copyCodeEnabled = false
+    }
+    try {
+      codeLanguage = normalizeCodeLanguage(await api.GetSetting(ctx, SETTING_COPY_CODE_LANGUAGE_KEY))
+    } catch {
+      codeLanguage = DEFAULT_SNIPPET_LANGUAGE
+    }
+    try {
       settingFontLabel = await api.GetTranslation(ctx, "setting_font_label")
       settingFontTooltip = await api.GetTranslation(ctx, "setting_font_tooltip")
     } catch {
@@ -440,6 +501,12 @@ export const plugin: Plugin = {
         if (resolved) {
           defaultFont = resolved
         }
+      }
+      if (key === SETTING_COPY_CODE_ENABLED_KEY) {
+        copyCodeEnabled = parseBoolean(value, false)
+      }
+      if (key === SETTING_COPY_CODE_LANGUAGE_KEY) {
+        codeLanguage = normalizeCodeLanguage(value)
       }
     })
 

@@ -16,6 +16,7 @@
       "plugin_name": "ASCII Art Generator",
       "plugin_desc": "Generate ASCII art strings.",
       "action_copy": "Copy ASCII art",
+      "action_copy_code": "Copy as %s code",
       "action_copy_font_name": "Copy font name",
       "action_more_fonts": "Try other fonts…",
       "action_save": "Save to file",
@@ -23,6 +24,7 @@
       "action_use_font": "Use this font",
       "command_font_desc": "Render text with a specific font",
       "command_fonts_desc": "Browse all bundled fonts",
+      "error_copy_code_failed": "Failed to build code snippet: %s",
       "error_font_not_found": "Font \"%s\" not found. Did you mean:",
       "error_render_failed": "Failed to render: %s",
       "font_item_subtitle": "Preview of \"%s\" · Enter to copy ASCII art",
@@ -32,6 +34,7 @@
       "help_subtitle": "e.g. %s hello · %s -f slant hello · %s fonts",
       "help_title": "Type text to generate ASCII art",
       "notify_copied": "ASCII art copied to clipboard",
+      "notify_copied_code": "Copied %s code to clipboard",
       "notify_copied_font_name": "Font name \"%s\" copied to clipboard",
       "notify_default_font": "Default font set to %s",
       "notify_saved": "Saved to %s",
@@ -40,6 +43,10 @@
       "query_hint_text": "text",
       "render_subtitle": "Font: %s · Enter to copy",
       "render_title": "ASCII art of \"%s\"",
+      "setting_code_language_label": "Code language / format",
+      "setting_code_language_tooltip": "Language or format used by the \"Copy as code\" action",
+      "setting_copy_code_label": "Copy as code",
+      "setting_copy_code_tooltip": "Add a \"Copy as code\" action to every result",
       "setting_font_label": "Default font",
       "setting_font_tooltip": "Font used when rendering without -f"
     },
@@ -47,6 +54,7 @@
       "plugin_name": "ASCII 艺术字生成器",
       "plugin_desc": "生成 ASCII 艺术字符串。",
       "action_copy": "复制 ASCII 艺术字",
+      "action_copy_code": "复制为 %s 代码",
       "action_copy_font_name": "复制字体名称",
       "action_more_fonts": "换个字体试试…",
       "action_save": "保存为文件",
@@ -54,6 +62,7 @@
       "action_use_font": "使用该字体",
       "command_font_desc": "使用指定字体渲染文本",
       "command_fonts_desc": "浏览所有内置字体",
+      "error_copy_code_failed": "生成代码片段失败：%s",
       "error_font_not_found": "找不到字体 \"%s\"，你是不是想找：",
       "error_render_failed": "渲染失败：%s",
       "font_item_subtitle": "\"%s\" 的预览 · 回车复制艺术字",
@@ -63,6 +72,7 @@
       "help_subtitle": "例如：%s hello · %s -f slant hello · %s fonts",
       "help_title": "输入文本生成 ASCII 艺术字",
       "notify_copied": "ASCII 艺术字已复制到剪贴板",
+      "notify_copied_code": "%s 代码已复制到剪贴板",
       "notify_copied_font_name": "字体名称 \"%s\" 已复制到剪贴板",
       "notify_default_font": "默认字体已设为 %s",
       "notify_saved": "已保存到 %s",
@@ -71,6 +81,10 @@
       "query_hint_text": "文本",
       "render_subtitle": "字体：%s · 回车复制",
       "render_title": "\"%s\" 的 ASCII 艺术字",
+      "setting_code_language_label": "代码语言 / 格式",
+      "setting_code_language_tooltip": "“复制为代码”动作使用的编程语言或输出格式",
+      "setting_copy_code_label": "复制为代码",
+      "setting_copy_code_tooltip": "在每条结果的操作菜单中添加“复制为代码”动作",
       "setting_font_label": "默认字体",
       "setting_font_tooltip": "未使用 -f 指定字体时使用的字体"
     }
@@ -1433,6 +1447,328 @@
           {
             "Label": "Wow",
             "Value": "Wow"
+          }
+        ],
+        "Validators": []
+      },
+      "DisabledInPlatforms": [],
+      "IsPlatformSpecific": false
+    },
+    {
+      "Type": "checkbox",
+      "Value": {
+        "Key": "copy_code_enabled",
+        "Label": "i18n:setting_copy_code_label",
+        "DefaultValue": "false",
+        "Tooltip": "i18n:setting_copy_code_tooltip"
+      },
+      "DisabledInPlatforms": [],
+      "IsPlatformSpecific": false
+    },
+    {
+      "Type": "select",
+      "Value": {
+        "Key": "copy_code_language",
+        "Label": "i18n:setting_code_language_label",
+        "Suffix": "",
+        "DefaultValue": "bash",
+        "Tooltip": "i18n:setting_code_language_tooltip",
+        "Options": [
+          {
+            "Label": "Bash",
+            "Value": "bash"
+          },
+          {
+            "Label": "PowerShell",
+            "Value": "powershell"
+          },
+          {
+            "Label": "Batch (cmd)",
+            "Value": "batch"
+          },
+          {
+            "Label": "Python",
+            "Value": "python"
+          },
+          {
+            "Label": "JavaScript",
+            "Value": "javascript"
+          },
+          {
+            "Label": "TypeScript",
+            "Value": "typescript"
+          },
+          {
+            "Label": "Java",
+            "Value": "java"
+          },
+          {
+            "Label": "Kotlin",
+            "Value": "kotlin"
+          },
+          {
+            "Label": "C",
+            "Value": "c"
+          },
+          {
+            "Label": "C++",
+            "Value": "cpp"
+          },
+          {
+            "Label": "C#",
+            "Value": "csharp"
+          },
+          {
+            "Label": "Go",
+            "Value": "go"
+          },
+          {
+            "Label": "Rust",
+            "Value": "rust"
+          },
+          {
+            "Label": "Swift",
+            "Value": "swift"
+          },
+          {
+            "Label": "Dart",
+            "Value": "dart"
+          },
+          {
+            "Label": "PHP",
+            "Value": "php"
+          },
+          {
+            "Label": "Ruby",
+            "Value": "ruby"
+          },
+          {
+            "Label": "Perl",
+            "Value": "perl"
+          },
+          {
+            "Label": "Lua",
+            "Value": "lua"
+          },
+          {
+            "Label": "R",
+            "Value": "r"
+          },
+          {
+            "Label": "MATLAB / Octave",
+            "Value": "matlab"
+          },
+          {
+            "Label": "SQL",
+            "Value": "sql"
+          },
+          {
+            "Label": "Haskell",
+            "Value": "haskell"
+          },
+          {
+            "Label": "Elixir",
+            "Value": "elixir"
+          },
+          {
+            "Label": "Scala",
+            "Value": "scala"
+          },
+          {
+            "Label": "Groovy",
+            "Value": "groovy"
+          },
+          {
+            "Label": "F#",
+            "Value": "fsharp"
+          },
+          {
+            "Label": "VB.NET",
+            "Value": "vbnet"
+          },
+          {
+            "Label": "Delphi / Pascal",
+            "Value": "pascal"
+          },
+          {
+            "Label": "Objective-C",
+            "Value": "objc"
+          },
+          {
+            "Label": "Fish",
+            "Value": "fish"
+          },
+          {
+            "Label": "Tcl",
+            "Value": "tcl"
+          },
+          {
+            "Label": "AWK",
+            "Value": "awk"
+          },
+          {
+            "Label": "OCaml",
+            "Value": "ocaml"
+          },
+          {
+            "Label": "Clojure",
+            "Value": "clojure"
+          },
+          {
+            "Label": "Common Lisp",
+            "Value": "lisp"
+          },
+          {
+            "Label": "Scheme / Racket",
+            "Value": "scheme"
+          },
+          {
+            "Label": "Erlang",
+            "Value": "erlang"
+          },
+          {
+            "Label": "Julia",
+            "Value": "julia"
+          },
+          {
+            "Label": "Nim",
+            "Value": "nim"
+          },
+          {
+            "Label": "Crystal",
+            "Value": "crystal"
+          },
+          {
+            "Label": "D",
+            "Value": "d"
+          },
+          {
+            "Label": "Zig",
+            "Value": "zig"
+          },
+          {
+            "Label": "Ada",
+            "Value": "ada"
+          },
+          {
+            "Label": "Fortran",
+            "Value": "fortran"
+          },
+          {
+            "Label": "COBOL",
+            "Value": "cobol"
+          },
+          {
+            "Label": "VBA",
+            "Value": "vba"
+          },
+          {
+            "Label": "T-SQL",
+            "Value": "tsql"
+          },
+          {
+            "Label": "PL/SQL",
+            "Value": "plsql"
+          },
+          {
+            "Label": "GDScript",
+            "Value": "gdscript"
+          },
+          {
+            "Label": "Arduino",
+            "Value": "arduino"
+          },
+          {
+            "Label": "Processing",
+            "Value": "processing"
+          },
+          {
+            "Label": "Raku",
+            "Value": "raku"
+          },
+          {
+            "Label": "Haxe",
+            "Value": "haxe"
+          },
+          {
+            "Label": "V",
+            "Value": "v"
+          },
+          {
+            "Label": "Prolog",
+            "Value": "prolog"
+          },
+          {
+            "Label": "Smalltalk",
+            "Value": "smalltalk"
+          },
+          {
+            "Label": "Wolfram Language",
+            "Value": "wolfram"
+          },
+          {
+            "Label": "AutoHotkey",
+            "Value": "autohotkey"
+          },
+          {
+            "Label": "AutoIt",
+            "Value": "autoit"
+          },
+          {
+            "Label": "CMake",
+            "Value": "cmake"
+          },
+          {
+            "Label": "Nushell",
+            "Value": "nushell"
+          },
+          {
+            "Label": "Verilog / SystemVerilog",
+            "Value": "verilog"
+          },
+          {
+            "Label": "VHDL",
+            "Value": "vhdl"
+          },
+          {
+            "Label": "ABAP",
+            "Value": "abap"
+          },
+          {
+            "Label": "HTML",
+            "Value": "html"
+          },
+          {
+            "Label": "Markdown",
+            "Value": "markdown"
+          },
+          {
+            "Label": "LaTeX",
+            "Value": "latex"
+          },
+          {
+            "Label": "JSON",
+            "Value": "json"
+          },
+          {
+            "Label": "YAML",
+            "Value": "yaml"
+          },
+          {
+            "Label": "TOML",
+            "Value": "toml"
+          },
+          {
+            "Label": "Makefile",
+            "Value": "makefile"
+          },
+          {
+            "Label": "Dockerfile",
+            "Value": "dockerfile"
+          },
+          {
+            "Label": "NASM (x86)",
+            "Value": "nasm"
           }
         ],
         "Validators": []

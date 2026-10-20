@@ -61,26 +61,33 @@ describe("fontCommandText", () => {
 const ctx = {} as Context
 const FONTS = ["Alpha", "Emboss 2", "Slant"]
 const changeQueries: string[] = []
+const copiedTexts: string[] = []
+let lastSettingChanged: ((ctx: Context, key: string, value: string) => void) | undefined
 
-function fakeApi(): PublicAPI {
+function fakeApi(settings: Record<string, string> = {}): PublicAPI {
   return {
     ChangeQuery: async (_ctx: Context, args: { QueryType: string; QueryText: string }) => {
       changeQueries.push(args.QueryText)
     },
     HideApp: async () => {},
     Notify: async () => {},
-    Copy: async () => {},
+    Copy: async (_ctx: Context, args: { text: string }) => {
+      copiedTexts.push(args.text)
+    },
     Log: async () => {},
     GetTranslation: async (_ctx: Context, key: string) => key,
-    GetSetting: async () => "",
+    GetSetting: async (_ctx: Context, key: string) => settings[key] ?? "",
     SetSetting: async () => ({ Success: true, ErrMsg: "" }),
-    OnSettingChanged: async () => {},
+    OnSettingChanged: async (_ctx: Context, callback: (ctx: Context, key: string, value: string) => void) => {
+      lastSettingChanged = callback
+    },
     OnGetDynamicSetting: async () => ({}) as never
   } as unknown as PublicAPI
 }
 
-async function runQuery(search: string, command = "", hint?: Query["QueryHint"]): Promise<Result[]> {
-  await plugin.init(ctx, { API: fakeApi(), PluginDirectory: "" } as PluginInitParams)
+async function runQuery(search: string, command = "", hint?: Query["QueryHint"], settings: Record<string, string> = {}): Promise<Result[]> {
+  copiedTexts.length = 0
+  await plugin.init(ctx, { API: fakeApi(settings), PluginDirectory: "" } as PluginInitParams)
   return (await plugin.query(ctx, { Command: command, Search: search, QueryHint: hint, TriggerKeyword: "ascii" } as unknown as Query)) as Result[]
 }
 
@@ -331,5 +338,66 @@ describe("art preview", () => {
     const html = htmlOf(buildArtPreview("x", {}, { Background: "#101010", Text: "#e0e0e0" }))
     expect(html).toContain("background:#101010")
     expect(html).toContain("color:#e0e0e0")
+  })
+})
+
+// The "copy as code" action is opt-in and uses the language selected in settings.
+describe("copy as code", () => {
+  test("is absent while the setting is off", async () => {
+    const results = await runQuery("hello")
+    expect(actionIds(results).some(id => id.startsWith("copy-code:"))).toBe(false)
+  })
+
+  test("copies the rendered art in the selected language", async () => {
+    const results = await runQuery("hello", "", undefined, {
+      copy_code_enabled: "true",
+      copy_code_language: "python"
+    })
+    expect(actionIds(results)).toContain("copy-code:Standard:python")
+
+    await clickAction(results[0], "copy-code:")
+    expect(copiedTexts).toEqual(['print("art:Standard:hello")'])
+  })
+
+  test("appears on every font list result with a unique action id", async () => {
+    const settings = { copy_code_enabled: "true", copy_code_language: "bash" }
+    const rendered = await runQuery("hello", "", undefined, settings)
+    // Jumping into the list is what records the text the list previews.
+    await clickAction(rendered[0], "more-fonts:")
+
+    const results = await runQuery("fonts", "", undefined, settings)
+    const ids = actionIds(results)
+    for (const font of FONTS) {
+      expect(ids).toContain(`copy-code:${font}:bash`)
+    }
+    expect(new Set(ids).size).toBe(ids.length)
+
+    await clickAction(results.find(result => result.Title === "Alpha")!, "copy-code:")
+    expect(copiedTexts).toEqual(["echo 'art:Alpha:hello'"])
+  })
+
+  test("follows setting changes without restarting the plugin", async () => {
+    lastSettingChanged = undefined
+    await plugin.init(ctx, {
+      API: fakeApi({ copy_code_enabled: "true", copy_code_language: "bash" }),
+      PluginDirectory: ""
+    } as PluginInitParams)
+    expect(lastSettingChanged).toBeDefined()
+
+    lastSettingChanged!(ctx, "copy_code_language", "go")
+    let results = (await plugin.query(ctx, {
+      Command: "",
+      Search: "hello",
+      TriggerKeyword: "ascii"
+    } as unknown as Query)) as Result[]
+    expect(actionIds(results)).toContain("copy-code:Standard:go")
+
+    lastSettingChanged!(ctx, "copy_code_enabled", "false")
+    results = (await plugin.query(ctx, {
+      Command: "",
+      Search: "hello",
+      TriggerKeyword: "ascii"
+    } as unknown as Query)) as Result[]
+    expect(actionIds(results).some(id => id.startsWith("copy-code:"))).toBe(false)
   })
 })
