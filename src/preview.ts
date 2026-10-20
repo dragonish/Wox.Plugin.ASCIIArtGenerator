@@ -40,6 +40,24 @@ const AVAILABLE_WIDTH = 400
 // Advance width of a monospace glyph in em.
 const GLYPH_WIDTH_RATIO = 0.6
 
+/** Body padding of the preview; the PNG renderer uses the same value. */
+export const PREVIEW_PADDING = 12
+/** CSS line-height of the preview, relative to the font size. */
+export const PREVIEW_LINE_HEIGHT = 1.15
+/**
+ * Font stack of the preview, in CSS fallback order. The PNG renderer resolves
+ * the same families to font files and falls back per character, so glyphs the
+ * primary font lacks (box drawing, braille, symbols) keep their preview look.
+ */
+export const PREVIEW_FONT_FAMILIES = ["Consolas", "Cascadia Mono", "Courier New", "ui-monospace", "monospace"]
+/** Colors used when the host cannot report its palette (Wox < 2.4.5). */
+export const FALLBACK_BACKGROUND = "#ffffff"
+export const FALLBACK_TEXT = "#1f2328"
+
+function cssFontFamily(family: string): string {
+  return /\s/.test(family) ? `"${family}"` : family
+}
+
 /**
  * Largest font size that keeps the widest line inside the preview panel.
  * Wide art shrinks down to 8px; narrow art is capped at 14px. Exported for tests.
@@ -66,15 +84,15 @@ export function buildArtPreview(art: string, properties: Record<string, string>,
   // one as an entity so the art survives the round trip unchanged.
   const body = art.startsWith("\n") ? `&#10;${escapeHtml(art.slice(1))}` : escapeHtml(art)
 
-  const colors = theme ? `background:${theme.Background};color:${theme.Text};` : "background:transparent;color:#1f2328;"
+  const colors = theme ? `background:${theme.Background};color:${theme.Text};` : `background:transparent;color:${FALLBACK_TEXT};`
   const darkFallback = theme ? "" : "@media (prefers-color-scheme:dark){body{color:#e6e6e6}}"
 
   const html = [
     '<!doctype html><html><head><meta charset="utf-8"><style>',
     "html,body{margin:0;padding:0}",
-    `body{padding:12px;overflow:auto;${colors}}`,
+    `body{padding:${PREVIEW_PADDING}px;overflow:auto;${colors}}`,
     darkFallback,
-    `pre{margin:0;white-space:pre;font-family:Consolas,"Cascadia Mono","Courier New",ui-monospace,monospace;font-size:${fontSize}px;line-height:1.15}`,
+    `pre{margin:0;white-space:pre;font-family:${PREVIEW_FONT_FAMILIES.map(cssFontFamily).join(",")};font-size:${fontSize}px;line-height:${PREVIEW_LINE_HEIGHT}}`,
     "</style></head><body><pre>",
     body,
     "</pre></body></html>"

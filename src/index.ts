@@ -3,6 +3,7 @@ import figlet from "figlet"
 import * as fs from "fs"
 import * as os from "os"
 import * as path from "path"
+import { renderArtImage } from "./image"
 import { buildArtPreview, PreviewTheme } from "./preview"
 import { buildSnippet, DEFAULT_SNIPPET_LANGUAGE, resolveSnippetLanguage, SNIPPET_LANGUAGES, SnippetLanguage } from "./snippets"
 
@@ -197,7 +198,7 @@ function pad(n: number): string {
   return n < 10 ? `0${n}` : `${n}`
 }
 
-function saveArtToFile(text: string, art: string): string {
+function saveArtToFile(text: string, data: string | Buffer, extension: string): string {
   const safe =
     text
       .replace(/[\\/:*?"<>|]/g, "")
@@ -205,8 +206,8 @@ function saveArtToFile(text: string, art: string): string {
       .slice(0, 40) || "ascii-art"
   const now = new Date()
   const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
-  const filePath = path.join(desktopDir(), `${safe}-${stamp}.txt`)
-  fs.writeFileSync(filePath, art, "utf-8")
+  const filePath = path.join(desktopDir(), `${safe}-${stamp}.${extension}`)
+  fs.writeFileSync(filePath, data)
   return filePath
 }
 
@@ -251,10 +252,53 @@ function saveAction(text: string, art: string, font: string): ResultAction {
     Name: "i18n:action_save",
     Action: async (actionCtx: Context) => {
       try {
-        const filePath = saveArtToFile(text, art)
+        const filePath = saveArtToFile(text, art, "txt")
         await api.Notify(actionCtx, await t(actionCtx, "notify_saved", filePath))
       } catch (e) {
         await api.Notify(actionCtx, await t(actionCtx, "error_render_failed", String(e)))
+      }
+      await api.HideApp(actionCtx)
+    }
+  }
+}
+
+function copyImageAction(text: string, art: string, font: string): ResultAction {
+  return {
+    Id: `copy-image:${font}`,
+    Name: "i18n:action_copy_image",
+    Action: async (actionCtx: Context) => {
+      try {
+        const image = await renderArtImage({ art, theme: await previewTheme(actionCtx) })
+        await api.Copy(actionCtx, {
+          type: "image",
+          text: "",
+          woxImage: {
+            ImageType: "base64",
+            ImageData: `data:image/png;base64,${image.buffer.toString("base64")}`
+          }
+        })
+        await api.Notify(actionCtx, await t(actionCtx, "notify_copied_image"))
+        await api.HideApp(actionCtx)
+        await api.Log(actionCtx, "Info", `Copied image of "${text}" in font ${font} (${image.width}x${image.height})`)
+      } catch (e) {
+        await api.Notify(actionCtx, await t(actionCtx, "error_image_failed", String(e)))
+      }
+    }
+  }
+}
+
+function saveImageAction(text: string, art: string, font: string): ResultAction {
+  return {
+    Id: `save-image:${font}`,
+    Name: "i18n:action_save_image",
+    Action: async (actionCtx: Context) => {
+      try {
+        const image = await renderArtImage({ art, theme: await previewTheme(actionCtx) })
+        const filePath = saveArtToFile(text, image.buffer, "png")
+        await api.Notify(actionCtx, await t(actionCtx, "notify_saved_image", filePath))
+        await api.Log(actionCtx, "Info", `Saved image of "${text}" in font ${font} to ${filePath}`)
+      } catch (e) {
+        await api.Notify(actionCtx, await t(actionCtx, "error_image_failed", String(e)))
       }
       await api.HideApp(actionCtx)
     }
@@ -278,11 +322,17 @@ async function renderResult(ctx: Context, text: string, font: string, art: strin
   const lines = art.split("\n").length
   const theme = await previewTheme(ctx)
   const actions: ResultAction[] = [copyAction(text, art, font)]
+  if (art) {
+    actions.push(copyImageAction(text, art, font))
+  }
   if (copyCodeEnabled) {
     const language = resolveSnippetLanguage(codeLanguage) ?? SNIPPET_LANGUAGES[0]
     actions.push(codeCopyAction(await t(ctx, "action_copy_code", language.Label), text, art, font, language))
   }
   actions.push(saveAction(text, art, font))
+  if (art) {
+    actions.push(saveImageAction(text, art, font))
+  }
   actions.push({
     Id: `more-fonts:${font}`,
     Name: "i18n:action_more_fonts",
@@ -341,6 +391,9 @@ async function fontListResults(ctx: Context, filter: string, trigger: string | u
     ]
     if (codeLanguageSpec && art) {
       actions.push(codeCopyAction(codeActionName, sample, art, font, codeLanguageSpec))
+    }
+    if (art) {
+      actions.push(copyImageAction(sample, art, font), saveImageAction(sample, art, font))
     }
     actions.push(
       {

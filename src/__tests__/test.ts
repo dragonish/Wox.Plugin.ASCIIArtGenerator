@@ -8,6 +8,8 @@ jest.mock("figlet", () => ({
 }))
 
 import { Context, PluginInitParams, PublicAPI, Query, Result, WoxPreview, WoxPreviewWebviewData } from "@wox-launcher/wox-plugin"
+import fs from "fs"
+import { resolveFontStack } from "../image"
 import { fontCommandText, fontsQueryText, plugin, tokenize } from "../index"
 import { buildArtPreview, unescapeHtml } from "../preview"
 
@@ -62,6 +64,7 @@ const ctx = {} as Context
 const FONTS = ["Alpha", "Emboss 2", "Slant"]
 const changeQueries: string[] = []
 const copiedTexts: string[] = []
+const copiedImages: string[] = []
 let lastSettingChanged: ((ctx: Context, key: string, value: string) => void) | undefined
 
 function fakeApi(settings: Record<string, string> = {}): PublicAPI {
@@ -71,8 +74,11 @@ function fakeApi(settings: Record<string, string> = {}): PublicAPI {
     },
     HideApp: async () => {},
     Notify: async () => {},
-    Copy: async (_ctx: Context, args: { text: string }) => {
+    Copy: async (_ctx: Context, args: { type?: string; text: string; woxImage?: { ImageData: string } }) => {
       copiedTexts.push(args.text)
+      if (args.type === "image" && args.woxImage) {
+        copiedImages.push(args.woxImage.ImageData)
+      }
     },
     Log: async () => {},
     GetTranslation: async (_ctx: Context, key: string) => key,
@@ -87,6 +93,7 @@ function fakeApi(settings: Record<string, string> = {}): PublicAPI {
 
 async function runQuery(search: string, command = "", hint?: Query["QueryHint"], settings: Record<string, string> = {}): Promise<Result[]> {
   copiedTexts.length = 0
+  copiedImages.length = 0
   await plugin.init(ctx, { API: fakeApi(settings), PluginDirectory: "" } as PluginInitParams)
   return (await plugin.query(ctx, { Command: command, Search: search, QueryHint: hint, TriggerKeyword: "ascii" } as unknown as Query)) as Result[]
 }
@@ -153,6 +160,8 @@ describe("action ids are unique within one query response", () => {
     for (const font of FONTS) {
       expect(ids).toContain(`copy-font-name:${font}`)
       expect(ids).toContain(`copy-art:${font}`)
+      expect(ids).toContain(`copy-image:${font}`)
+      expect(ids).toContain(`save-image:${font}`)
       expect(ids).toContain(`set-default:${font}`)
       expect(ids).toContain(`use-font:${font}`)
     }
@@ -399,5 +408,48 @@ describe("copy as code", () => {
       TriggerKeyword: "ascii"
     } as unknown as Query)) as Result[]
     expect(actionIds(results).some(id => id.startsWith("copy-code:"))).toBe(false)
+  })
+})
+
+// Image actions rasterize the same art string the webview preview shows.
+// They need a real monospace font, so skip them on hosts without one.
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+const imageTest = resolveFontStack().length > 0 ? test : test.skip
+
+describe("image actions", () => {
+  imageTest("copies a PNG built from the previewed art", async () => {
+    const results = await runQuery("hello")
+    await clickAction(results[0], "copy-image:")
+
+    expect(copiedImages).toHaveLength(1)
+    const prefix = "data:image/png;base64,"
+    expect(copiedImages[0].startsWith(prefix)).toBe(true)
+    const png = Buffer.from(copiedImages[0].slice(prefix.length), "base64")
+    expect(png.subarray(0, 8)).toEqual(PNG_SIGNATURE)
+  })
+
+  imageTest("saves the PNG to the desktop", async () => {
+    const write = jest.spyOn(fs, "writeFileSync").mockImplementation(() => undefined)
+    try {
+      const results = await runQuery("hello")
+      await clickAction(results[0], "save-image:")
+
+      expect(write).toHaveBeenCalledTimes(1)
+      const [file, data] = write.mock.calls[0]
+      expect(String(file)).toMatch(/\.png$/)
+      expect(Buffer.isBuffer(data)).toBe(true)
+      expect((data as Buffer).subarray(0, 8)).toEqual(PNG_SIGNATURE)
+    } finally {
+      write.mockRestore()
+    }
+  })
+
+  imageTest("is available on font list results", async () => {
+    const rendered = await runQuery("hello")
+    await clickAction(rendered[0], "more-fonts:")
+    const results = await runQuery("fonts")
+
+    await clickAction(results.find(result => result.Title === "Slant")!, "copy-image:")
+    expect(copiedImages).toHaveLength(1)
   })
 })
