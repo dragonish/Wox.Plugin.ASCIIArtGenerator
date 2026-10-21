@@ -40,23 +40,17 @@ let settingFontLabel = "Default font"
 let settingFontTooltip = "Font used when rendering without -f"
 const previewCache = new Map<string, string>()
 
-// GetThemeColors needs Wox >= 2.4.5 and one round trip per call, so remember the
-// palette for a while: a font list can hold 120 results in a single response.
+// GetThemeColors costs one round trip per call, so remember the palette for a
+// while: a font list can hold 120 results in a single response.
 const THEME_CACHE_MS = 5 * 60 * 1000
-let themeCache: { theme: PreviewTheme | undefined; at: number } | undefined
+let themeCache: { theme: PreviewTheme; at: number } | undefined
 
-async function previewTheme(ctx: Context): Promise<PreviewTheme | undefined> {
+async function previewTheme(ctx: Context): Promise<PreviewTheme> {
   if (themeCache && Date.now() - themeCache.at < THEME_CACHE_MS) {
     return themeCache.theme
   }
-  let theme: PreviewTheme | undefined
-  try {
-    const colors = await api.GetThemeColors(ctx, {})
-    theme = { Background: colors.Background, Text: colors.Text }
-  } catch {
-    // Older Wox releases have no GetThemeColors; the preview falls back to CSS.
-    theme = undefined
-  }
+  const colors = await api.GetThemeColors(ctx, {})
+  const theme = { Background: colors.Background, Text: colors.Text }
   themeCache = { theme, at: Date.now() }
   return theme
 }
@@ -622,8 +616,8 @@ export const plugin: Plugin = {
     // ascii -f <font> <text> / ascii --font=<font> <text> — render with an explicit font
     // Wox installs the "-f" QueryHint declared in plugin.json once the user types `ascii -f `,
     // which keeps the font name (spaces allowed) and the text in separate Tab-navigable slots.
-    // Prefer the hint only when both slots are filled; otherwise (paste, a boundary-crossing
-    // edit, an older Wox, or the user never pressed Tab) parse the text as before.
+    // Prefer the hint only when both slots are filled; otherwise (paste, a
+    // boundary-crossing edit, or the user never pressed Tab) parse the text as before.
     const hintFont = hintArgument(query, "font")
     const hintText = hintArgument(query, "text")
 

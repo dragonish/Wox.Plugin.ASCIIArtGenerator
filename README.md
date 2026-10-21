@@ -100,8 +100,7 @@ Saved files fall back to the home directory when there is no `Desktop` folder.
 
 ## Requirements
 
-- Wox >= 2.4.3
-- Wox >= 2.4.5 for previews and exported images that follow the active theme (older versions fall back to a built-in light/dark palette)
+- Wox >= 2.4.7
 - Windows, Linux, or macOS
 - The Node.js runtime, the FIGlet fonts, and the PNG rasterizer are bundled in the released package; nothing else needs to be installed
 

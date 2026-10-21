@@ -4,7 +4,7 @@ import * as path from "path"
 import { Writable } from "stream"
 import * as PImage from "pureimage"
 import type { Font as OpenTypeFont } from "opentype.js"
-import { FALLBACK_BACKGROUND, FALLBACK_TEXT, PREVIEW_FONT_FAMILIES, PREVIEW_LINE_HEIGHT, PREVIEW_PADDING, PreviewTheme, previewFontSize } from "./preview"
+import { PREVIEW_FONT_FAMILIES, PREVIEW_LINE_HEIGHT, PREVIEW_PADDING, PreviewTheme, previewFontSize } from "./preview"
 
 /** Rendered PNG plus its pixel size, used by the copy/save actions. */
 export interface ArtImage {
@@ -15,7 +15,7 @@ export interface ArtImage {
 
 export interface RenderArtImageOptions {
   art: string
-  theme?: PreviewTheme
+  theme: PreviewTheme
   /** Pixel multiplier; 2 keeps the art crisp on HiDPI displays. */
   scale?: number
 }
@@ -315,9 +315,9 @@ export async function renderArtImage(options: RenderArtImageOptions): Promise<Ar
 
   const image = PImage.make(width, height)
   const ctx = image.getContext("2d")
-  ctx.fillStyle = options.theme?.Background ?? FALLBACK_BACKGROUND
+  ctx.fillStyle = options.theme.Background
   ctx.fillRect(0, 0, width, height)
-  ctx.fillStyle = options.theme?.Text ?? FALLBACK_TEXT
+  ctx.fillStyle = options.theme.Text
   ctx.textBaseline = "alphabetic"
 
   const primary = fonts[0]

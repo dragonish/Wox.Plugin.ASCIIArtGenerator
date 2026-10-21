@@ -5,7 +5,7 @@
   "Description": "i18n:plugin_desc",
   "Author": "dragonish",
   "Version": "0.0.1",
-  "MinWoxVersion": "2.4.3",
+  "MinWoxVersion": "2.4.7",
   "Runtime": "nodejs",
   "Website": "https://github.com/dragonish/Wox.Plugin.ASCIIArtGenerator",
   "Entry": "index.js",
@@ -129,6 +129,7 @@
         "Suffix": "",
         "DefaultValue": "Standard",
         "Tooltip": "i18n:setting_font_tooltip",
+        "Filterable": true,
         "Options": [
           {
             "Label": "1Row",
@@ -1483,6 +1484,7 @@
         "Suffix": "",
         "DefaultValue": "bash",
         "Tooltip": "i18n:setting_code_language_tooltip",
+        "Filterable": true,
         "Options": [
           {
             "Label": "Bash",

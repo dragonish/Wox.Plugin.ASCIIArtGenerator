@@ -3,6 +3,7 @@ import * as PImage from "pureimage"
 import { artImageLines, renderArtImage, resolveFontStack } from "../image"
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+const TEST_THEME = { Background: "#ffffff", Text: "#1f2328" }
 
 describe("artImageLines", () => {
   test("keeps interior blank lines", () => {
@@ -32,8 +33,8 @@ async function decode(buffer: Buffer): Promise<PImage.Bitmap> {
 
 describe("renderArtImage", () => {
   imageTest("produces a PNG at the requested scale", async () => {
-    const one = await renderArtImage({ art: "ab\ncd", scale: 1 })
-    const two = await renderArtImage({ art: "ab\ncd", scale: 2 })
+    const one = await renderArtImage({ art: "ab\ncd", scale: 1, theme: TEST_THEME })
+    const two = await renderArtImage({ art: "ab\ncd", scale: 2, theme: TEST_THEME })
 
     expect(one.buffer.subarray(0, 8)).toEqual(PNG_SIGNATURE)
     expect(two.buffer.subarray(0, 8)).toEqual(PNG_SIGNATURE)
@@ -49,7 +50,7 @@ describe("renderArtImage", () => {
   })
 
   imageTest("renders empty art without failing", async () => {
-    const image = await renderArtImage({ art: "" })
+    const image = await renderArtImage({ art: "", theme: TEST_THEME })
     expect(image.buffer.subarray(0, 8)).toEqual(PNG_SIGNATURE)
     expect(image.width).toBeGreaterThan(0)
     expect(image.height).toBeGreaterThan(0)

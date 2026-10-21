@@ -83,6 +83,7 @@ function fakeApi(settings: Record<string, string> = {}): PublicAPI {
     Log: async () => {},
     GetTranslation: async (_ctx: Context, key: string) => key,
     GetSetting: async (_ctx: Context, key: string) => settings[key] ?? "",
+    GetThemeColors: async () => ({ Background: "#ffffff", Text: "#1f2328" }),
     SetSetting: async () => ({ Success: true, ErrMsg: "" }),
     OnSettingChanged: async (_ctx: Context, callback: (ctx: Context, key: string, value: string) => void) => {
       lastSettingChanged = callback
@@ -310,40 +311,42 @@ describe("query hint slots", () => {
 // A `text` preview inherits the UI font, where spaces are proportional and figlet
 // drawings collapse. The art therefore ships as monospace HTML in a webview preview.
 describe("art preview", () => {
+  const TEST_THEME = { Background: "#ffffff", Text: "#1f2328" }
+
   function htmlOf(preview: WoxPreview): string {
     return (JSON.parse(preview.PreviewData) as WoxPreviewWebviewData).html ?? ""
   }
 
   test("uses a monospace stack and preformatted whitespace", () => {
-    const html = htmlOf(buildArtPreview("a  b\n c", { Font: "Standard" }))
+    const html = htmlOf(buildArtPreview("a  b\n c", { Font: "Standard" }, TEST_THEME))
     expect(html).toContain("white-space:pre")
     expect(html).toContain("monospace")
   })
 
   test("escapes art so figlet glyphs survive the HTML round trip", () => {
     const art = ' /\\\n<&> "quoted"'
-    const html = htmlOf(buildArtPreview(art, {}))
+    const html = htmlOf(buildArtPreview(art, {}, TEST_THEME))
     expect(html).not.toContain("<&>")
-    expect(previewData({ Preview: buildArtPreview(art, {}) } as Result)).toBe(art)
+    expect(previewData({ Preview: buildArtPreview(art, {}, TEST_THEME) } as Result)).toBe(art)
   })
 
   test("keeps a leading newline instead of letting the parser drop it", () => {
     const art = "\nabc"
-    expect(previewData({ Preview: buildArtPreview(art, {}) } as Result)).toBe(art)
+    expect(previewData({ Preview: buildArtPreview(art, {}, TEST_THEME) } as Result)).toBe(art)
   })
 
   test("shrinks wide art but never below 8px", () => {
-    const narrow = previewData({ Preview: buildArtPreview("x".repeat(10), {}) } as Result)
+    const narrow = previewData({ Preview: buildArtPreview("x".repeat(10), {}, TEST_THEME) } as Result)
     expect(narrow).toBe("x".repeat(10))
 
-    const wideHtml = htmlOf(buildArtPreview("x".repeat(200), {}))
+    const wideHtml = htmlOf(buildArtPreview("x".repeat(200), {}, TEST_THEME))
     expect(wideHtml).toContain("font-size:8px")
 
-    const narrowHtml = htmlOf(buildArtPreview("x", {}))
+    const narrowHtml = htmlOf(buildArtPreview("x", {}, TEST_THEME))
     expect(narrowHtml).toContain("font-size:14px")
   })
 
-  test("applies the launcher palette when the host provides one", () => {
+  test("applies the launcher palette", () => {
     const html = htmlOf(buildArtPreview("x", {}, { Background: "#101010", Text: "#e0e0e0" }))
     expect(html).toContain("background:#101010")
     expect(html).toContain("color:#e0e0e0")

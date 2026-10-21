@@ -1,9 +1,6 @@
 import type { WoxPreview, WoxPreviewWebviewData } from "@wox-launcher/wox-plugin"
 
-/**
- * Colors of the launcher palette, mirrored from PublicAPI.GetThemeColors.
- * `GetThemeColors` requires Wox >= 2.4.5, so callers must treat this as optional.
- */
+/** Colors of the launcher palette, mirrored from PublicAPI.GetThemeColors. */
 export interface PreviewTheme {
   Background: string
   Text: string
@@ -50,9 +47,6 @@ export const PREVIEW_LINE_HEIGHT = 1.15
  * primary font lacks (box drawing, braille, symbols) keep their preview look.
  */
 export const PREVIEW_FONT_FAMILIES = ["Consolas", "Cascadia Mono", "Courier New", "ui-monospace", "monospace"]
-/** Colors used when the host cannot report its palette (Wox < 2.4.5). */
-export const FALLBACK_BACKGROUND = "#ffffff"
-export const FALLBACK_TEXT = "#1f2328"
 
 function cssFontFamily(family: string): string {
   return /\s/.test(family) ? `"${family}"` : family
@@ -78,20 +72,18 @@ export function previewFontSize(art: string): number {
  * widths and every figlet drawing falls apart. A `webview` preview pins the art
  * to a monospace stack, so columns line up in any theme and on any platform.
  */
-export function buildArtPreview(art: string, properties: Record<string, string>, theme?: PreviewTheme): WoxPreview {
+export function buildArtPreview(art: string, properties: Record<string, string>, theme: PreviewTheme): WoxPreview {
   const fontSize = previewFontSize(art)
   // A newline directly after <pre> is dropped by the HTML parser; keep a leading
   // one as an entity so the art survives the round trip unchanged.
   const body = art.startsWith("\n") ? `&#10;${escapeHtml(art.slice(1))}` : escapeHtml(art)
 
-  const colors = theme ? `background:${theme.Background};color:${theme.Text};` : `background:transparent;color:${FALLBACK_TEXT};`
-  const darkFallback = theme ? "" : "@media (prefers-color-scheme:dark){body{color:#e6e6e6}}"
+  const colors = `background:${theme.Background};color:${theme.Text};`
 
   const html = [
     '<!doctype html><html><head><meta charset="utf-8"><style>',
     "html,body{margin:0;padding:0}",
     `body{padding:${PREVIEW_PADDING}px;overflow:auto;${colors}}`,
-    darkFallback,
     `pre{margin:0;white-space:pre;font-family:${PREVIEW_FONT_FAMILIES.map(cssFontFamily).join(",")};font-size:${fontSize}px;line-height:${PREVIEW_LINE_HEIGHT}}`,
     "</style></head><body><pre>",
     body,
