@@ -1,4 +1,4 @@
-import { Context, Plugin, PluginInitParams, PluginSettingDefinitionItem, PublicAPI, Query, Result, ResultAction, WoxImage } from "@wox-launcher/wox-plugin"
+import { Context, Plugin, PluginInitParams, PluginSettingDefinitionItem, PublicAPI, Query, Result, ResultAction, WoxImage, WoxPreviewTag } from "@wox-launcher/wox-plugin"
 import figlet from "figlet"
 import * as fs from "fs"
 import * as os from "os"
@@ -122,6 +122,22 @@ async function t(ctx: Context, key: string, ...args: string[]): Promise<string> 
 function renderArt(text: string, font: string): string {
   // Throws when the font file is missing or the text cannot be rendered.
   return figletAny.textSync(text, { font })
+}
+
+/**
+ * Number of visible rows in rendered art. figlet may end its output with a
+ * newline, which would otherwise count as an extra empty line. Exported for tests.
+ */
+export function artLineCount(art: string): number {
+  return art.replace(/\r?\n$/, "").split("\n").length
+}
+
+/**
+ * Count Unicode code points instead of UTF-16 code units, so an emoji counts as
+ * one character rather than two. Exported for tests.
+ */
+export function characterCount(text: string): number {
+  return Array.from(text).length
 }
 
 function resolveFont(name: string): string | undefined {
@@ -313,8 +329,20 @@ function listFontsAction(trigger: string | undefined, sample = ""): ResultAction
 }
 
 async function renderResult(ctx: Context, text: string, font: string, art: string, trigger: string | undefined): Promise<Result> {
-  const lines = art.split("\n").length
+  const lines = artLineCount(art)
   const theme = await previewTheme(ctx)
+  const [fontTooltip, linesLabel, linesTooltip, charactersLabel, charactersTooltip] = await Promise.all([
+    t(ctx, "preview_label_font"),
+    t(ctx, "preview_lines", String(lines)),
+    t(ctx, "preview_label_lines"),
+    t(ctx, "preview_characters", String(characterCount(text))),
+    t(ctx, "preview_label_characters")
+  ])
+  const previewTags: WoxPreviewTag[] = [
+    { Label: font, Tooltip: fontTooltip },
+    { Label: linesLabel, Tooltip: linesTooltip },
+    { Label: charactersLabel, Tooltip: charactersTooltip }
+  ]
   const actions: ResultAction[] = [copyAction(text, art, font)]
   if (art) {
     actions.push(copyImageAction(text, art, font))
@@ -342,15 +370,7 @@ async function renderResult(ctx: Context, text: string, font: string, art: strin
     SubTitle: await t(ctx, "render_subtitle", font),
     Icon: appIcon,
     Score: 100,
-    Preview: buildArtPreview(
-      art,
-      {
-        Font: font,
-        Lines: String(lines),
-        Characters: String(text.length)
-      },
-      theme
-    ),
+    Preview: buildArtPreview(art, previewTags, theme),
     Actions: actions
   }
 }
@@ -359,7 +379,7 @@ async function fontListResults(ctx: Context, filter: string, trigger: string | u
   const sample = listSample || SAMPLE_FALLBACK
   const lower = filter.toLowerCase()
   const matched = fontNames.filter(f => !lower || f.toLowerCase().includes(lower)).slice(0, 120)
-  const subtitle = await t(ctx, "font_item_subtitle", sample)
+  const [subtitle, fontTooltip, sampleTooltip] = await Promise.all([t(ctx, "font_item_subtitle", sample), t(ctx, "preview_label_font"), t(ctx, "preview_label_sample")])
   const theme = await previewTheme(ctx)
   const codeLanguageSpec = copyCodeEnabled ? resolveSnippetLanguage(codeLanguage) : undefined
   const codeActionName = codeLanguageSpec ? await t(ctx, "action_copy_code", codeLanguageSpec.Label) : ""
@@ -438,10 +458,10 @@ async function fontListResults(ctx: Context, filter: string, trigger: string | u
     if (art) {
       result.Preview = buildArtPreview(
         art,
-        {
-          Font: font,
-          Sample: sample
-        },
+        [
+          { Label: font, Tooltip: fontTooltip },
+          { Label: sample, Tooltip: sampleTooltip }
+        ],
         theme
       )
     }

@@ -10,7 +10,7 @@ jest.mock("figlet", () => ({
 import { Context, PluginInitParams, PublicAPI, Query, Result, WoxPreview, WoxPreviewWebviewData } from "@wox-launcher/wox-plugin"
 import fs from "fs"
 import { resolveFontStack } from "../image"
-import { fontCommandText, fontsQueryText, plugin, tokenize } from "../index"
+import { artLineCount, characterCount, fontCommandText, fontsQueryText, plugin, tokenize } from "../index"
 import { buildArtPreview, unescapeHtml } from "../preview"
 
 describe("tokenize", () => {
@@ -81,7 +81,15 @@ function fakeApi(settings: Record<string, string> = {}): PublicAPI {
       }
     },
     Log: async () => {},
-    GetTranslation: async (_ctx: Context, key: string) => key,
+    GetTranslation: async (_ctx: Context, key: string) => {
+      // Preview labels are formatted by the plugin, so return templates for the
+      // two keys where the test asserts the rendered label rather than the key.
+      const templates: Record<string, string> = {
+        preview_characters: "%s characters",
+        preview_lines: "%s lines"
+      }
+      return templates[key] ?? key
+    },
     GetSetting: async (_ctx: Context, key: string) => settings[key] ?? "",
     GetThemeColors: async () => ({ Background: "#ffffff", Text: "#1f2328" }),
     SetSetting: async () => ({ Success: true, ErrMsg: "" }),
@@ -318,38 +326,80 @@ describe("art preview", () => {
   }
 
   test("uses a monospace stack and preformatted whitespace", () => {
-    const html = htmlOf(buildArtPreview("a  b\n c", { Font: "Standard" }, TEST_THEME))
+    const html = htmlOf(buildArtPreview("a  b\n c", [{ Label: "Standard", Tooltip: "Font" }], TEST_THEME))
     expect(html).toContain("white-space:pre")
     expect(html).toContain("monospace")
   })
 
   test("escapes art so figlet glyphs survive the HTML round trip", () => {
     const art = ' /\\\n<&> "quoted"'
-    const html = htmlOf(buildArtPreview(art, {}, TEST_THEME))
+    const html = htmlOf(buildArtPreview(art, [], TEST_THEME))
     expect(html).not.toContain("<&>")
-    expect(previewData({ Preview: buildArtPreview(art, {}, TEST_THEME) } as Result)).toBe(art)
+    expect(previewData({ Preview: buildArtPreview(art, [], TEST_THEME) } as Result)).toBe(art)
   })
 
   test("keeps a leading newline instead of letting the parser drop it", () => {
     const art = "\nabc"
-    expect(previewData({ Preview: buildArtPreview(art, {}, TEST_THEME) } as Result)).toBe(art)
+    expect(previewData({ Preview: buildArtPreview(art, [], TEST_THEME) } as Result)).toBe(art)
   })
 
   test("shrinks wide art but never below 8px", () => {
-    const narrow = previewData({ Preview: buildArtPreview("x".repeat(10), {}, TEST_THEME) } as Result)
+    const narrow = previewData({ Preview: buildArtPreview("x".repeat(10), [], TEST_THEME) } as Result)
     expect(narrow).toBe("x".repeat(10))
 
-    const wideHtml = htmlOf(buildArtPreview("x".repeat(200), {}, TEST_THEME))
+    const wideHtml = htmlOf(buildArtPreview("x".repeat(200), [], TEST_THEME))
     expect(wideHtml).toContain("font-size:8px")
 
-    const narrowHtml = htmlOf(buildArtPreview("x", {}, TEST_THEME))
+    const narrowHtml = htmlOf(buildArtPreview("x", [], TEST_THEME))
     expect(narrowHtml).toContain("font-size:14px")
   })
 
   test("applies the launcher palette", () => {
-    const html = htmlOf(buildArtPreview("x", {}, { Background: "#101010", Text: "#e0e0e0" }))
+    const html = htmlOf(buildArtPreview("x", [], { Background: "#101010", Text: "#e0e0e0" }))
     expect(html).toContain("background:#101010")
     expect(html).toContain("color:#e0e0e0")
+  })
+
+  test("keeps metadata tags in declaration order", () => {
+    const tags = [
+      { Label: "Standard", Tooltip: "Font" },
+      { Label: "6 lines", Tooltip: "Lines" },
+      { Label: "5 characters", Tooltip: "Characters" }
+    ]
+    expect(buildArtPreview("x", tags, TEST_THEME).PreviewTags).toEqual(tags)
+  })
+})
+
+describe("preview counts", () => {
+  test("ignores a trailing newline when counting rows", () => {
+    expect(artLineCount("a\nb")).toBe(2)
+    expect(artLineCount("a\nb\n")).toBe(2)
+    expect(artLineCount("a\r\nb\r\n")).toBe(2)
+  })
+
+  test("counts Unicode code points instead of UTF-16 units", () => {
+    expect(characterCount("hello")).toBe(5)
+    expect(characterCount("a😀")).toBe(2)
+    expect("a😀".length).toBe(3)
+  })
+})
+
+describe("preview metadata", () => {
+  test("labels render dimensions with localized units", async () => {
+    const results = await runQuery("hello")
+    expect(results[0].Preview?.PreviewTags).toEqual([
+      { Label: "Standard", Tooltip: "preview_label_font" },
+      { Label: "1 lines", Tooltip: "preview_label_lines" },
+      { Label: "5 characters", Tooltip: "preview_label_characters" }
+    ])
+  })
+
+  test("describes the font list sample", async () => {
+    const results = await runQuery("fonts")
+    expect(results[0].Preview?.PreviewTags).toEqual([
+      { Label: "Alpha", Tooltip: "preview_label_font" },
+      { Label: "Hello", Tooltip: "preview_label_sample" }
+    ])
   })
 })
 

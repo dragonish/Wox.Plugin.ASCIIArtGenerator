@@ -1,4 +1,4 @@
-import type { WoxPreview, WoxPreviewWebviewData } from "@wox-launcher/wox-plugin"
+import type { WoxPreview, WoxPreviewTag, WoxPreviewWebviewData } from "@wox-launcher/wox-plugin"
 
 /** Colors of the launcher palette, mirrored from PublicAPI.GetThemeColors. */
 export interface PreviewTheme {
@@ -71,8 +71,11 @@ export function previewFontSize(art: string): number {
  * `text` previews use the UI font, where spaces and glyphs have proportional
  * widths and every figlet drawing falls apart. A `webview` preview pins the art
  * to a monospace stack, so columns line up in any theme and on any platform.
+ *
+ * Tags are an array, so their display order is stable (unlike the deprecated
+ * PreviewProperties map, whose order the launcher does not preserve).
  */
-export function buildArtPreview(art: string, properties: Record<string, string>, theme: PreviewTheme): WoxPreview {
+export function buildArtPreview(art: string, tags: WoxPreviewTag[], theme: PreviewTheme): WoxPreview {
   const fontSize = previewFontSize(art)
   // A newline directly after <pre> is dropped by the HTML parser; keep a leading
   // one as an entity so the art survives the round trip unchanged.
@@ -94,6 +97,6 @@ export function buildArtPreview(art: string, properties: Record<string, string>,
   return {
     PreviewType: "webview",
     PreviewData: JSON.stringify(data),
-    PreviewProperties: properties
+    PreviewTags: tags
   }
 }
