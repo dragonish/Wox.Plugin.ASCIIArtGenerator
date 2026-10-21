@@ -24,6 +24,14 @@ A [Wox](https://www.woxlauncher.com/) plugin that turns plain text into **ASCII 
 - **Localized** — English and Simplified Chinese, following the Wox language.
 - **Offline** — no network access, no external services.
 
+## Screenshots
+
+![render](assets/render.jpg)
+
+![fonts](assets/fonts.jpg)
+
+![3d](assets/3d.jpg)
+
 ## Install
 
 ```shell
