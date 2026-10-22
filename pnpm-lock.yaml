@@ -14,6 +14,9 @@ importers:
       figlet:
         specifier: ^1.12.0
         version: 1.12.0
+      opentype.js:
+        specifier: ^0.4.11
+        version: 0.4.11
       pureimage:
         specifier: ^0.4.20
         version: 0.4.20
