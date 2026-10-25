@@ -108,7 +108,7 @@ Saved files fall back to the home directory when there is no `Desktop` folder.
 
 ## Requirements
 
-- Wox >= 2.4.7
+- Wox >= 2.4.8
 - Windows, Linux, or macOS
 - The Node.js runtime, the FIGlet fonts, and the PNG rasterizer are bundled in the released package; nothing else needs to be installed
 

@@ -1,4 +1,4 @@
-import { Context, Plugin, PluginInitParams, PluginSettingDefinitionItem, PublicAPI, Query, Result, ResultAction, WoxImage, WoxPreviewTag } from "@wox-launcher/wox-plugin"
+﻿import { Context, Plugin, PluginInitParams, PluginSettingDefinitionItem, PublicAPI, Query, Result, ResultAction, WoxImage, WoxPreviewTag } from "@wox-launcher/wox-plugin"
 import figlet from "figlet"
 import * as fs from "fs"
 import * as os from "os"
@@ -577,10 +577,7 @@ export const plugin: Plugin = {
       }
     })
 
-    // Only takes effect on Wox releases that accept the "dynamic" setting type in
-    // plugin.json (Wox commit 48aed244, unreleased as of v2.4.7). Until the manifest
-    // declares {"Type":"dynamic","Value":{"Key":"font_setting"}}, Wox never calls this
-    // callback and the static select in plugin.json is used instead.
+    // Wox version 2.4.8 or later is required.
     await api.OnGetDynamicSetting(ctx, (_c, key): PluginSettingDefinitionItem => {
       if (key !== DYNAMIC_SETTING_KEY) {
         return {
