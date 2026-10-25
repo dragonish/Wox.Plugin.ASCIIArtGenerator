@@ -1,22 +1,16 @@
 {
   "Id": "242ec423-0ac0-47d9-8c93-e72c4d509eb2",
-  "TriggerKeywords": [
-    "ascii"
-  ],
+  "TriggerKeywords": ["ascii"],
   "Name": "i18n:plugin_name",
   "Description": "i18n:plugin_desc",
   "Author": "dragonish",
-  "Version": "0.0.8",
+  "Version": "1.0.1",
   "MinWoxVersion": "2.4.7",
   "Runtime": "nodejs",
   "Website": "https://github.com/dragonish/Wox.Plugin.ASCIIArtGenerator",
   "Entry": "index.js",
   "Icon": "relative:images/app.svg",
-  "SupportedOS": [
-    "Windows",
-    "Linux",
-    "Darwin"
-  ],
+  "SupportedOS": ["Windows", "Linux", "Darwin"],
   "I18n": {
     "en_US": {
       "plugin_name": "ASCII Art Generator",
@@ -122,40 +116,18 @@
       "Command": "fonts",
       "Description": "i18n:command_fonts_desc",
       "QueryHint": {
-        "Elements": [
-          {
-            "Id": "filter",
-            "Kind": "argument",
-            "Placeholder": "i18n:query_hint_filter"
-          }
-        ]
+        "Elements": [{ "Id": "filter", "Kind": "argument", "Placeholder": "i18n:query_hint_filter" }]
       }
     },
     {
       "Command": "-f",
       "Description": "i18n:command_font_desc",
-      "Aliases": [
-        "--font"
-      ],
+      "Aliases": ["--font"],
       "QueryHint": {
         "Elements": [
-          {
-            "Id": "font",
-            "Kind": "argument",
-            "Placeholder": "i18n:query_hint_font",
-            "Required": true
-          },
-          {
-            "Id": "sep",
-            "Kind": "text",
-            "Text": " "
-          },
-          {
-            "Id": "text",
-            "Kind": "argument",
-            "Placeholder": "i18n:query_hint_text",
-            "Required": true
-          }
+          { "Id": "font", "Kind": "argument", "Placeholder": "i18n:query_hint_font", "Required": true },
+          { "Id": "sep", "Kind": "text", "Text": " " },
+          { "Id": "text", "Kind": "argument", "Placeholder": "i18n:query_hint_text", "Required": true }
         ]
       }
     }
